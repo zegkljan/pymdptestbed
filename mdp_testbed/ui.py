@@ -23,12 +23,18 @@ class ResourceMazeEditor(tk.Frame):
         super().__init__(master, cnf, **kw)
 
         self.maze = internal.Maze(2, 2, 0)
+        self.height_var = tk.IntVar(value=2)
+        self.width_var = tk.IntVar(value=2)
+        self.zoom_var = tk.IntVar(value=40)
+        self.reward_var = tk.DoubleVar()
+        self.edit_mode_var = tk.IntVar(value=EditMode.normal.value)
 
         self.grid(sticky=tk.N + tk.S + tk.E + tk.W)
 
         top = self.winfo_toplevel()
         top.columnconfigure(0, weight=1)
         top.rowconfigure(0, weight=1)
+        top.wm_title('Resoruce Maze Editor')
 
         self.create_widgets()
 
@@ -37,19 +43,18 @@ class ResourceMazeEditor(tk.Frame):
         self.menu_panel.grid(column=0, row=0, sticky=tk.N + tk.S)
 
         # left menu
-        self.height_field = tk.Entry(self.menu_panel)
-        self.height_field.grid(column=0, row=0)
-        self.height_field.delete(0, tk.END)
-        self.height_field.insert(0, '2')
-        self.width_field = tk.Entry(self.menu_panel)
-        self.width_field.grid(column=0, row=1)
-        self.width_field.delete(0, tk.END)
-        self.width_field.insert(0, '2')
-        self.width_button = tk.Button(self.menu_panel, text='Height\nWidth',
-                                      command=self.set_size)
-        self.width_button.grid(column=1, row=0, rowspan=2, sticky=tk.W + tk.E)
+        self.width_field = tk.Entry(self.menu_panel,
+                                    textvariable=self.width_var)
+        self.width_field.grid(column=0, row=0)
+        self.height_field = tk.Entry(self.menu_panel,
+                                     textvariable=self.height_var)
+        self.height_field.grid(column=0, row=1)
+        self.size_button = tk.Button(self.menu_panel, text='Width\nx\nHeight',
+                                     command=self.set_size)
+        self.size_button.grid(column=1, row=0, rowspan=2, sticky=tk.W + tk.E)
 
-        self.reward_field = tk.Entry(self.menu_panel)
+        self.reward_field = tk.Entry(self.menu_panel,
+                                     textvariable=self.reward_var)
         self.reward_field.grid(column=0, row=2)
         self.reward_field.delete(0, tk.END)
         self.reward_field.insert(0, '50')
@@ -97,14 +102,13 @@ class ResourceMazeEditor(tk.Frame):
         self.load_maze_button.grid(column=0, row=9, columnspan=2,
                                    sticky=tk.W + tk.E)
 
-        self.zoom_separator = ttk.Separator(self.menu_panel,
-                                            orient=tk.HORIZONTAL)
-        self.zoom_separator.grid(column=0, row=10, columnspan=2,
-                                 sticky=tk.N + tk.S + tk.W + tk.E, pady=3)
+        ttk.Separator(self.menu_panel, orient=tk.HORIZONTAL).grid(
+            column=0, row=10, columnspan=2, sticky=tk.N + tk.S + tk.W + tk.E,
+            pady=3)
 
         self.zoom_scale = tk.Scale(self.menu_panel, orient=tk.HORIZONTAL,
                                    label='Cell size (zoom)', command=self.zoom,
-                                   from_=20, to=100)
+                                   from_=20, to=100, variable=self.zoom_var)
         self.zoom_scale.set(50)
         self.zoom_scale.grid(column=0, row=11, columnspan=22,
                              sticky=tk.W + tk.E)
@@ -113,8 +117,8 @@ class ResourceMazeEditor(tk.Frame):
             column=1, row=0, sticky=tk.N + tk.S + tk.W + tk.E, padx=3)
 
         # maze view panel
-        self.maze_view = MazeView(self, self.maze, EditMode.normal,
-                                  self.reward_field)
+        self.maze_view = MazeView(self, self.maze, self.zoom_var,
+                                  self.reward_var, self.edit_mode_var)
         self.maze_view.grid(column=2, row=0, sticky=tk.N + tk.S + tk.W + tk.E)
         self.maze_view.repaint()
 
@@ -122,14 +126,13 @@ class ResourceMazeEditor(tk.Frame):
         self.rowconfigure(0, weight=1)
 
     def set_size(self, *args):
-        w = int(self.width_field.get())
-        h = int(self.height_field.get())
+        w = int(self.width_var.get())
+        h = int(self.height_var.get())
         self.maze.__init__(w, h, 0)
         self.maze_view.repaint()
 
     # noinspection PyUnboundLocalVariable
     def toggle_mode(self, mode, *args):
-        print('Current edit mode: {}'.format(self.maze_view.edit_mode))
         self.reward_button.config(relief='raised')
         self.add_walls_button.config(relief='raised')
         self.add_absorbing_goals_button.config(relief='raised')
@@ -144,13 +147,14 @@ class ResourceMazeEditor(tk.Frame):
         elif mode is EditMode.reward:
             button = self.reward_button
 
-        if mode is self.maze_view.edit_mode:
+        curr_mode = EditMode(self.edit_mode_var.get())
+        if mode is curr_mode:
             button.config(relief='raised')
-            self.maze_view.edit_mode = EditMode.normal
+            self.edit_mode_var.set(EditMode.normal.value)
         else:
             button.config(relief='sunken')
-            self.maze_view.edit_mode = mode
-        print('Current edit mode changed to: {}'.format(self.maze_view.edit_mode))
+            self.edit_mode_var.set(mode.value)
+        print('Edit mode: {}'.format(EditMode(self.edit_mode_var.get())))
 
     def set_reward_global(self, *args):
         val = float(self.reward_field.get())
@@ -161,8 +165,7 @@ class ResourceMazeEditor(tk.Frame):
         self.maze_view.repaint()
 
     def zoom(self, *args):
-        val = self.zoom_scale.get()
-        self.maze_view.set_zoom(val)
+        self.maze_view.repaint()
 
     def reset_maze(self, * args):
         self.maze.__init__(self.maze.get_width(), self.maze.get_height(), 0.0)
@@ -191,13 +194,14 @@ class SolutionViewer(tk.Frame):
 
 
 class MazeView(tk.Frame):
-    def __init__(self, master, maze, edit_mode, reward_field, **kw):
+    def __init__(self, master, maze, zoom_var, reward_var, edit_mode_var, **kw):
         cnf = {}
         super().__init__(master, cnf, **kw)
 
         self.maze = maze
-        self.edit_mode = edit_mode
-        self.reward_field = reward_field
+        self.zoom_var = zoom_var
+        self.reward_var = reward_var
+        self.edit_mode_var = edit_mode_var
         self.node_length = 70
         self.wall_width = 7
         self.offset = (10, 10)
@@ -216,15 +220,12 @@ class MazeView(tk.Frame):
         self.canvas.bind('<Button-1>', func=self.handle_click)
         self.canvas.grid(sticky=tk.N + tk.S + tk.W + tk.E)
 
-    def set_zoom(self, zoom):
-        self.node_length = zoom
-        self.repaint()
-
     def handle_click(self, evt: tk.Event):
         mx = evt.x
         my = evt.y
         print('Mouse clicked at: {} {}'.format(mx, my))
-        if self.edit_mode is EditMode.walls:
+        edit_mode = EditMode(self.edit_mode_var.get())
+        if edit_mode is EditMode.walls:
             ids = self.canvas.find_overlapping(mx - self.node_length / 10,
                                                my - self.node_length / 10,
                                                mx + self.node_length / 10,
@@ -255,21 +256,22 @@ class MazeView(tk.Frame):
             if len(xys) != 1:
                 return
             x, y = xys[0]
-            if self.edit_mode is EditMode.absorbing:
+            if edit_mode is EditMode.absorbing:
                 self.maze.set_absorbing_goal(
                     x, y, not self.maze.is_absorbing_goal(x, y))
                 self.repaint()
-            elif self.edit_mode is EditMode.teleport:
+            elif edit_mode is EditMode.teleport:
                 self.maze.set_teleport_state(
                     x, y, not self.maze.is_teleport_state(x, y))
                 self.repaint()
-            elif self.edit_mode is EditMode.reward:
-                val = float(self.reward_field.get())
+            elif edit_mode is EditMode.reward:
+                val = float(self.reward_var.get())
                 self.maze.set_reward(x, y, val)
                 self.repaint()
 
     def repaint(self):
         self.canvas.delete(tk.ALL)
+        self.node_length = self.zoom_var.get()
         self.draw_values()
         self.draw_maze()
         self.draw_walls()
