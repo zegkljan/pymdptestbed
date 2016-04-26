@@ -16,13 +16,26 @@ class EditMode(enum.Enum):
     reward = 5
 
 
+class Container(object):
+    def __init__(self, contents=None):
+        self._contents = contents
+
+    @property
+    def val(self):
+        return self._contents
+
+    @val.setter
+    def val(self, contents):
+        self._contents = contents
+
+
 # noinspection PyAttributeOutsideInit
 class ResourceMazeEditor(tk.Frame):
     def __init__(self, master=None, **kw):
         cnf = {}
         super().__init__(master, cnf, **kw)
 
-        self.maze = internal.Maze(2, 2, 0)
+        self.maze_cont = Container()
         self.height_var = tk.IntVar(value=2)
         self.width_var = tk.IntVar(value=2)
         self.zoom_var = tk.IntVar(value=40)
@@ -37,6 +50,14 @@ class ResourceMazeEditor(tk.Frame):
         top.wm_title('Resoruce Maze Editor')
 
         self.create_widgets()
+
+    @property
+    def maze(self):
+        return self.maze_cont.val
+
+    @maze.setter
+    def maze(self, m):
+        self.maze_cont.val = m
 
     def create_widgets(self):
         self.menu_panel = tk.Frame(self)
@@ -117,7 +138,7 @@ class ResourceMazeEditor(tk.Frame):
             column=1, row=0, sticky=tk.N + tk.S + tk.W + tk.E, padx=3)
 
         # maze view panel
-        self.maze_view = MazeView(self, self.maze, self.zoom_var,
+        self.maze_view = MazeView(self, self.maze_cont, self.zoom_var,
                                   self.reward_var, self.edit_mode_var)
         self.maze_view.grid(column=2, row=0, sticky=tk.N + tk.S + tk.W + tk.E)
         self.maze_view.repaint()
@@ -128,7 +149,7 @@ class ResourceMazeEditor(tk.Frame):
     def set_size(self, *args):
         w = int(self.width_var.get())
         h = int(self.height_var.get())
-        self.maze.__init__(w, h, 0)
+        self.maze = internal.Maze(w, h, 0)
         self.maze_view.repaint()
 
     # noinspection PyUnboundLocalVariable
@@ -181,7 +202,7 @@ class ResourceMazeEditor(tk.Frame):
         fn = fd.askopenfilename(defaultextension='.zip',
                                 filetypes=[('ZIP', '*.zip')],
                                 initialdir='./mazes')
-        self.maze.load_from_file(fn)
+        self.maze = internal.Maze.load_from_file(fn)
         self.width_field.delete(0)
         self.height_field.delete(0)
         self.width_field.insert(0, str(self.maze.get_width()))
@@ -190,21 +211,121 @@ class ResourceMazeEditor(tk.Frame):
 
 
 class SolutionViewer(tk.Frame):
-    pass
-
-
-class MazeView(tk.Frame):
-    def __init__(self, master, maze, zoom_var, reward_var, edit_mode_var, **kw):
+    def __init__(self, master=None, **kw):
         cnf = {}
         super().__init__(master, cnf, **kw)
 
-        self.maze = maze
+        self.maze_cont = Container()
+        self.zoom_var = tk.IntVar(value=40)
+        self.draw_actions_var = tk.BooleanVar(value=True)
+        self.draw_values_var = tk.BooleanVar(value=True)
+        self.draw_goals_var = tk.BooleanVar(value=False)
+        self.draw_rewards_var = tk.BooleanVar(value=False)
+        self.draw_teleports_var = tk.BooleanVar(value=False)
+        self.draw_walls_var = tk.BooleanVar(value=True)
+
+        self.grid(sticky=tk.N + tk.S + tk.E + tk.W)
+
+        top = self.winfo_toplevel()
+        top.columnconfigure(0, weight=1)
+        top.rowconfigure(0, weight=1)
+        top.wm_title('MDP Solution Viewer')
+
+        self.create_widgets()
+
+    @property
+    def maze(self):
+        return self.maze_cont.val
+
+    @maze.setter
+    def maze(self, m):
+        self.maze_cont.val = m
+
+    # noinspection PyAttributeOutsideInit
+    def create_widgets(self):
+        self.menu_panel = tk.Frame(self)
+        self.menu_panel.grid(column=0, row=0, sticky=tk.N + tk.S)
+
+        # left menu
+        self.draw_actions_cb = tk.Checkbutton(self.menu_panel,
+                                              text='draw actions',
+                                              variable=self.draw_actions_var)
+        self.draw_actions_cb.grid(column=0, row=0, sticky=tk.W)
+
+        self.draw_values_cb = tk.Checkbutton(self.menu_panel,
+                                             text='draw values',
+                                             variable=self.draw_values_var)
+        self.draw_values_cb.grid(column=0, row=1, sticky=tk.W)
+
+        self.draw_goals_cb = tk.Checkbutton(self.menu_panel,
+                                            text='draw goals',
+                                            variable=self.draw_goals_var)
+        self.draw_goals_cb.grid(column=0, row=2, sticky=tk.W)
+
+        self.draw_rewards_cb = tk.Checkbutton(self.menu_panel,
+                                              text='draw rewards',
+                                              variable=self.draw_rewards_var)
+        self.draw_rewards_cb.grid(column=0, row=3, sticky=tk.W)
+
+        self.draw_teleports_cb = tk.Checkbutton(
+            self.menu_panel, text='draw teleports',
+            variable=self.draw_teleports_var)
+        self.draw_teleports_cb.grid(column=0, row=4, sticky=tk.W)
+
+        self.draw_walls_cb = tk.Checkbutton(self.menu_panel,
+                                            text='draw walls',
+                                            variable=self.draw_walls_var)
+        self.draw_walls_cb.grid(column=0, row=5, sticky=tk.W)
+
+        ttk.Separator(self.menu_panel, orient=tk.HORIZONTAL).grid(
+            column=0, row=6, sticky=tk.N + tk.S + tk.W + tk.E, pady=3)
+        self.load_maze_button = tk.Button(self.menu_panel, text='Load maze',
+                                          command=self.load_maze)
+        self.load_maze_button.grid(column=0, row=7, sticky=tk.W + tk.E)
+
+        self.zoom_scale = tk.Scale(self.menu_panel, orient=tk.HORIZONTAL,
+                                   label='Cell size (zoom)', command=self.zoom,
+                                   from_=20, to=100, variable=self.zoom_var)
+        self.zoom_scale.set(50)
+        self.zoom_scale.grid(column=0, row=8, sticky=tk.W + tk.E)
+
+        # maze view panel
+        self.maze_view = SolutionView(self, self.maze_cont, self.zoom_var,
+                                      self.draw_actions_var,
+                                      self.draw_values_var,
+                                      self.draw_goals_var,
+                                      self.draw_rewards_var,
+                                      self.draw_teleports_var,
+                                      self.draw_walls_var)
+        self.maze_view.grid(column=2, row=0, sticky=tk.N + tk.S + tk.W + tk.E)
+        self.maze_view.repaint()
+
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(0, weight=1)
+
+    def zoom(self, *args):
+        self.maze_view.repaint()
+
+    def load_maze(self, *args):
+        fn = fd.askopenfilename(defaultextension='.zip',
+                                filetypes=[('ZIP', '*.zip')],
+                                initialdir='./mazes')
+        self.maze = internal.Maze.load_from_file(fn)
+        self.maze_view.repaint()
+
+
+class MazeView(tk.Frame):
+    def __init__(self, master, maze_cont, zoom_var, reward_var, edit_mode_var, **kw):
+        cnf = {}
+        super().__init__(master, cnf, **kw)
+
+        self.maze_cont = maze_cont
         self.zoom_var = zoom_var
         self.reward_var = reward_var
         self.edit_mode_var = edit_mode_var
         self.node_length = 70
         self.wall_width = 7
-        self.offset = (10, 10)
+        self.offset = (5, 5)
         self.normal_color = '#ffffff'
         self.goal_color = '#fc8b25'
         self.teleport_color = '#648b25'
@@ -213,14 +334,21 @@ class MazeView(tk.Frame):
         self.maze_wall_lines_ids = set()
         self.cell_ids = dict()
 
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
         self.canvas = tk.Canvas(self)
         self.canvas.bind('<Button-1>', func=self.handle_click)
-        self.canvas.grid(sticky=tk.N + tk.S + tk.W + tk.E)
+        self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
+
+    @property
+    def maze(self):
+        return self.maze_cont.val
+
+    @maze.setter
+    def maze(self, m):
+        self.maze_cont.val = m
 
     def handle_click(self, evt: tk.Event):
+        if self.maze is None:
+            return
         mx = evt.x
         my = evt.y
         print('Mouse clicked at: {} {}'.format(mx, my))
@@ -271,16 +399,20 @@ class MazeView(tk.Frame):
 
     def repaint(self):
         self.canvas.delete(tk.ALL)
+        if self.maze is None:
+            return
         self.node_length = self.zoom_var.get()
-        self.draw_values()
-        self.draw_maze()
-        self.draw_walls()
-        self.draw_rewards()
-        self.draw_actions()
+        self._draw_values()
+        self._draw_maze()
+        self._draw_goals()
+        self._draw_teleports()
+        self._draw_walls()
+        self._draw_rewards()
+        self._draw_actions()
 
         self.canvas.move(tk.ALL, *self.offset)
 
-    def draw_text(self, x: int, y: int, c, text: str):
+    def _draw_text(self, x: int, y: int, c, text: str):
         id_ = self.canvas.create_text(
             x * self.node_length + self.wall_width / 2 + 2,
             (y + 1) * self.node_length - self.wall_width / 2 - 2,
@@ -290,29 +422,38 @@ class MazeView(tk.Frame):
         )
         self.label_ids.add(id_)
 
-    def draw_rewards(self):
+    def _draw_rewards(self):
         for x, y in prod(self.maze.get_width(), self.maze.get_height()):
-            self.draw_text(x, y, 'black', str(self.maze.get_reward(x, y)))
+            self._draw_text(x, y, 'black', str(self.maze.get_reward(x, y)))
 
-    def draw_maze(self):
+    def _draw_maze(self):
         self.cell_ids.clear()
         for ix, iy in prod(self.maze.get_width(), self.maze.get_height()):
-            f = self.normal_color
-            if self.maze.is_teleport_state(ix, iy):
-                f = self.teleport_color
-            elif self.maze.is_absorbing_goal(ix, iy):
-                f = self.goal_color
-            x = ix * self.node_length
-            y = iy * self.node_length
-            id_ = self.canvas.create_rectangle(x,
-                                               y,
-                                               x + self.node_length,
-                                               y + self.node_length,
-                                               width=1,
-                                               fill=f)
+            id_ = self._draw_cell(ix, iy, self.normal_color)
             self.cell_ids[id_] = (ix, iy)
 
-    def draw_walls(self):
+    def _draw_goals(self):
+        for ix, iy in prod(self.maze.get_width(), self.maze.get_height()):
+            if self.maze.is_absorbing_goal(ix, iy):
+                self._draw_cell(ix, iy, self.goal_color)
+
+    def _draw_teleports(self):
+        for ix, iy in prod(self.maze.get_width(), self.maze.get_height()):
+            if self.maze.is_teleport_state(ix, iy):
+                self._draw_cell(ix, iy, self.teleport_color)
+
+    def _draw_cell(self, ix, iy, f):
+        if f is None:
+            f = self.normal_color
+        x = ix * self.node_length
+        y = iy * self.node_length
+        id_ = self.canvas.create_rectangle(x, y,
+                                           x + self.node_length,
+                                           y + self.node_length,
+                                           width=1, fill=f)
+        return id_
+
+    def _draw_walls(self):
         h = self.maze.get_height()
         w = self.maze.get_width()
 
@@ -348,12 +489,59 @@ class MazeView(tk.Frame):
                                           width=self.wall_width)
             self.maze_wall_lines_ids.add(id_)
 
-    def draw_values(self):
+    def _draw_values(self):
         pass
 
-    def draw_actions(self):
+    def _draw_actions(self):
         pass
 
 
 class SolutionView(MazeView):
-    pass
+    def __init__(self, master, maze_cont, zoom_var, draw_actions_var,
+                 draw_values_var, draw_goals_var, draw_rewards_var,
+                 draw_teleports_var, draw_walls_var, **kw):
+        super().__init__(master, maze_cont, zoom_var, tk.IntVar(),
+                         tk.IntVar(value=EditMode.normal.value), **kw)
+
+        self.draw_actions_var = draw_actions_var
+        self.draw_actions_var.trace('w',
+                                    lambda *a: self.repaint())
+        self.draw_values_var = draw_values_var
+        self.draw_values_var.trace('w',
+                                   lambda *a: self.repaint())
+        self.draw_goals_var = draw_goals_var
+        self.draw_goals_var.trace('w',
+                                  lambda *a: self.repaint())
+        self.draw_rewards_var = draw_rewards_var
+        self.draw_rewards_var.trace('w',
+                                    lambda *a: self.repaint())
+        self.draw_teleports_var = draw_teleports_var
+        self.draw_teleports_var.trace('w',
+                                      lambda *a: self.repaint())
+        self.draw_walls_var = draw_walls_var
+        self.draw_walls_var.trace('w',
+                                  lambda *a: self.repaint())
+
+    def _draw_actions(self):
+        if self.draw_actions_var.get():
+            super()._draw_actions()
+
+    def _draw_rewards(self):
+        if self.draw_rewards_var.get():
+            super()._draw_rewards()
+
+    def _draw_values(self):
+        if self.draw_values_var.get():
+            super()._draw_values()
+
+    def _draw_walls(self):
+        if self.draw_walls_var.get():
+            return super()._draw_walls()
+
+    def _draw_teleports(self):
+        if self.draw_teleports_var.get():
+            super()._draw_teleports()
+
+    def _draw_goals(self):
+        if self.draw_goals_var.get():
+            return super()._draw_goals()

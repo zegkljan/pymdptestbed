@@ -23,7 +23,8 @@ if __name__ == '__main__':
 
     if arg.lower() == 'editor':
         editor = ui.ResourceMazeEditor()
-        editor.master.title = 'Maze editor'
         editor.mainloop()
     else:
         print('TODO run VI algorithm')
+        viewer = ui.SolutionViewer()
+        viewer.mainloop()

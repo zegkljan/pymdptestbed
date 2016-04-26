@@ -173,20 +173,23 @@ class Maze(object):
                         compress_type=compression)
         print('Successfully saved.')
 
-    def load_from_file(self, filename):
+    @staticmethod
+    def load_from_file(filename):
         print('Loading maze from "{}"'.format(filename))
+        m = Maze(0, 0, 0)
         with zipfile.ZipFile(filename, mode='r') as zf:
             with zf.open('rewards.txt', mode='r') as f:
-                self.maze_rewards = np.loadtxt(f, dtype='d', ndmin=2)
+                m.maze_rewards = np.loadtxt(f, dtype='d', ndmin=2)
             with zf.open('goals.txt', mode='r') as f:
-                self.absorbing_goal_states = np.loadtxt(f, dtype='?', ndmin=2)
+                m.absorbing_goal_states = np.loadtxt(f, dtype='?', ndmin=2)
             with zf.open('teleports.txt', mode='r') as f:
-                self.teleport_states = np.loadtxt(f, dtype='?', ndmin=2)
+                m.teleport_states = np.loadtxt(f, dtype='?', ndmin=2)
             with zf.open('vertical_walls.txt', mode='r') as f:
-                self.vertical_walls = np.loadtxt(f, dtype='?', ndmin=2)
+                m.vertical_walls = np.loadtxt(f, dtype='?', ndmin=2)
             with zf.open('horizontal_walls.txt', mode='r') as f:
-                self.horizontal_walls = np.loadtxt(f, dtype='?', ndmin=2)
+                m.horizontal_walls = np.loadtxt(f, dtype='?', ndmin=2)
         print('Successfully loaded.')
+        return m
 
 
 class State(object):
