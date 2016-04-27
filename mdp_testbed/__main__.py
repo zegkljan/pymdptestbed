@@ -26,7 +26,6 @@ if __name__ == '__main__':
         editor = ui.ResourceMazeEditor()
         editor.mainloop()
     else:
-        print('TODO run VI algorithm')
         foo = SourceFileLoader('module', arg).load_module()
         viewer = ui.SolutionViewer(foo.Solver())
         viewer.mainloop()

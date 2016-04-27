@@ -2,7 +2,7 @@ import mdp_testbed
 import mdp_testbed.internal
 
 
-# noinspection PyAttributeOutsideInit
+# noinspection PyAttributeOutsideInit,PyMethodMayBeStatic
 class Solver(object):
     def solve_mdp(self, environment: mdp_testbed.Environment):
         self.environment = environment
