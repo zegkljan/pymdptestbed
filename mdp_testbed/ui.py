@@ -1,11 +1,23 @@
+import enum
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.ttk as ttk
-import enum
-import itertools
 
-from mdp_testbed.utils import prod
+import numpy as np
+
+import mdp_testbed
 import mdp_testbed.internal as internal
+from mdp_testbed.utils import prod
+
+act_vector = {internal.Action.N: np.array([0, -1], dtype='l'),
+              internal.Action.S: np.array([0, +1], dtype='l'),
+              internal.Action.W: np.array([-1, 0], dtype='l'),
+              internal.Action.E: np.array([+1, 0], dtype='l')}
+
+
+def val2color(val, min_val, max_val, col_min, col_max):
+    return int((val - min_val) / (max_val - min_val) * (col_max - col_min) +
+               col_min)
 
 
 class EditMode(enum.Enum):
@@ -211,7 +223,7 @@ class ResourceMazeEditor(tk.Frame):
 
 
 class SolutionViewer(tk.Frame):
-    def __init__(self, master=None, **kw):
+    def __init__(self, solution, master=None, **kw):
         cnf = {}
         super().__init__(master, cnf, **kw)
 
@@ -231,7 +243,7 @@ class SolutionViewer(tk.Frame):
         top.rowconfigure(0, weight=1)
         top.wm_title('MDP Solution Viewer')
 
-        self.create_widgets()
+        self.create_widgets(solution)
 
     @property
     def maze(self):
@@ -242,7 +254,7 @@ class SolutionViewer(tk.Frame):
         self.maze_cont.val = m
 
     # noinspection PyAttributeOutsideInit
-    def create_widgets(self):
+    def create_widgets(self, solution):
         self.menu_panel = tk.Frame(self)
         self.menu_panel.grid(column=0, row=0, sticky=tk.N + tk.S)
 
@@ -296,7 +308,7 @@ class SolutionViewer(tk.Frame):
                                       self.draw_goals_var,
                                       self.draw_rewards_var,
                                       self.draw_teleports_var,
-                                      self.draw_walls_var)
+                                      self.draw_walls_var, solution)
         self.maze_view.grid(column=2, row=0, sticky=tk.N + tk.S + tk.W + tk.E)
         self.maze_view.repaint()
 
@@ -311,6 +323,7 @@ class SolutionViewer(tk.Frame):
                                 filetypes=[('ZIP', '*.zip')],
                                 initialdir='./mazes')
         self.maze = internal.Maze.load_from_file(fn)
+        self.maze_view.environment = mdp_testbed.Environment(self.maze)
         self.maze_view.repaint()
 
 
@@ -319,16 +332,19 @@ class MazeView(tk.Frame):
         cnf = {}
         super().__init__(master, cnf, **kw)
 
-        self.maze_cont = maze_cont
-        self.zoom_var = zoom_var
-        self.reward_var = reward_var
-        self.edit_mode_var = edit_mode_var
         self.node_length = 70
         self.wall_width = 7
         self.offset = (5, 5)
         self.normal_color = '#ffffff'
-        self.goal_color = '#fc8b25'
-        self.teleport_color = '#648b25'
+        self.goal_color = '#ff0000'
+        self.teleport_color = '#0000ff'
+
+        self.maze_cont = maze_cont
+
+        self.zoom_var = zoom_var
+        self.reward_var = reward_var
+        self.edit_mode_var = edit_mode_var
+
         self.label_ids = set()
         self.maze_grid_lines_ids = set()
         self.maze_wall_lines_ids = set()
@@ -402,29 +418,42 @@ class MazeView(tk.Frame):
         if self.maze is None:
             return
         self.node_length = self.zoom_var.get()
-        self._draw_values()
         self._draw_maze()
+        self._draw_values()
         self._draw_goals()
         self._draw_teleports()
-        self._draw_walls()
-        self._draw_rewards()
         self._draw_actions()
+        self._draw_rewards()
+        self._draw_walls()
 
         self.canvas.move(tk.ALL, *self.offset)
 
-    def _draw_text(self, x: int, y: int, c, text: str):
+    def _draw_text(self, x: int, y: int, c, text: str, place):
+        if place == tk.SW:
+            anchor = tk.SW
+            dx = 0
+            dy = 1
+            ex = self.wall_width / 2 + 2
+            ey = -self.wall_width / 2 - 2
+        elif place == tk.NE:
+            anchor = tk.NE
+            dx = 1
+            dy = 0
+            ex = -self.wall_width / 2 - 2
+            ey = self.wall_width / 2 + 2
         id_ = self.canvas.create_text(
-            x * self.node_length + self.wall_width / 2 + 2,
-            (y + 1) * self.node_length - self.wall_width / 2 - 2,
+            (x + dx) * self.node_length + ex,
+            (y + dy) * self.node_length + ey,
             text=text,
             fill=c,
-            anchor=tk.SW
+            anchor=anchor
         )
         self.label_ids.add(id_)
 
     def _draw_rewards(self):
         for x, y in prod(self.maze.get_width(), self.maze.get_height()):
-            self._draw_text(x, y, 'black', str(self.maze.get_reward(x, y)))
+            self._draw_text(x, y, 'black', str(self.maze.get_reward(x, y)),
+                            tk.SW)
 
     def _draw_maze(self):
         self.cell_ids.clear()
@@ -499,9 +528,25 @@ class MazeView(tk.Frame):
 class SolutionView(MazeView):
     def __init__(self, master, maze_cont, zoom_var, draw_actions_var,
                  draw_values_var, draw_goals_var, draw_rewards_var,
-                 draw_teleports_var, draw_walls_var, **kw):
+                 draw_teleports_var, draw_walls_var, solution, **kw):
         super().__init__(master, maze_cont, zoom_var, tk.IntVar(),
                          tk.IntVar(value=EditMode.normal.value), **kw)
+
+        self.arrow_length_frac = 0.7
+        self.arrow_feather_length_frac = 0.7
+        self.arrow_feather_angle = 20
+        self.arrow_color = '#ff0000'
+        self.arrow_width = 1
+
+        cs = np.cos(np.deg2rad(self.arrow_feather_angle))
+        sn = np.sin(np.deg2rad(self.arrow_feather_angle))
+        self.feather_rot_mat1 = np.array([[cs, -sn],
+                                          [sn, cs]])
+        self.feather_rot_mat2 = np.array([[cs, sn],
+                                          [-sn, cs]])
+
+        self._environment = None
+        self._solution = solution
 
         self.draw_actions_var = draw_actions_var
         self.draw_actions_var.trace('w',
@@ -522,17 +567,49 @@ class SolutionView(MazeView):
         self.draw_walls_var.trace('w',
                                   lambda *a: self.repaint())
 
+    @property
+    def environment(self) -> mdp_testbed.Environment:
+        return self._environment
+
+    @environment.setter
+    def environment(self, environment: mdp_testbed.Environment):
+        self._environment = environment
+        self._solution.solve_mdp(self._environment)
+
     def _draw_actions(self):
-        if self.draw_actions_var.get():
-            super()._draw_actions()
+        if not self.draw_actions_var.get():
+            return
+        for state in self.environment.get_all_states():
+            action = self._solution.get_action_for_state(state)
+            if not state.is_dummy():
+                x, y = state.get_coords()
+
+                self._draw_arrow(x, y, action)
 
     def _draw_rewards(self):
         if self.draw_rewards_var.get():
             super()._draw_rewards()
 
     def _draw_values(self):
-        if self.draw_values_var.get():
-            super()._draw_values()
+        if not self.draw_values_var.get():
+            return
+        state_value = [(s, self._solution.get_value_for_state(s)) for s in
+                       self.environment.get_all_states()]
+        min_v = min(map(lambda x: x[1], state_value))
+        max_v = max(map(lambda x: x[1], state_value))
+
+        for s, v in state_value:
+            if s.is_dummy():
+                continue
+            x, y = s.get_coords()
+            r = 0
+            g = val2color(v, min_v, max_v, 50, 150)
+            b = 0
+
+            c = '#{:02x}{:02x}{:02x}'.format(r, g, b)
+            self._draw_cell(x, y, c)
+
+            self._draw_text(x, y, 'red', '{:.3f}'.format(v), tk.NE)
 
     def _draw_walls(self):
         if self.draw_walls_var.get():
@@ -545,3 +622,24 @@ class SolutionView(MazeView):
     def _draw_goals(self):
         if self.draw_goals_var.get():
             return super()._draw_goals()
+
+    def _draw_arrow(self, x, y, action):
+        l = self.arrow_length_frac * self.node_length / 2
+        c = np.array([x, y])
+        c = self.node_length * (c + .5)
+        v = act_vector[action]
+        e = c + v * l
+
+        self.canvas.create_line(c[0], c[1], e[0], e[1], width=self.arrow_width,
+                                fill=self.arrow_color)
+        f_v = self.feather_rot_mat1.dot(-v)
+        f_e = e + f_v * self.arrow_feather_length_frac * l
+        self.canvas.create_line(e[0], e[1], f_e[0], f_e[1],
+                                width=self.arrow_width,
+                                fill=self.arrow_color)
+        f_v = self.feather_rot_mat2.dot(-v)
+        f_e = e + f_v * self.arrow_feather_length_frac * l
+        self.canvas.create_line(e[0], e[1], f_e[0], f_e[1],
+                                width=self.arrow_width,
+                                fill=self.arrow_color)
+

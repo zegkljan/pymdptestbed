@@ -1,7 +1,8 @@
-import numpy as np
 import enum
-import zipfile
 import io
+import zipfile
+
+import numpy as np
 
 # noinspection PyBroadException
 try:
@@ -224,7 +225,7 @@ class State(object):
     @staticmethod
     def dummy():
         # noinspection PyTypeChecker
-        s = State(None, None, None, None, None)
+        s = State(None, None, 0, None, None)
         s._dummy = True
         return s
 
@@ -233,6 +234,9 @@ class State(object):
 
     def get_y(self) -> int:
         return self._y
+
+    def get_coords(self) -> tuple:
+        return self._x, self._y
 
     def is_absorbing(self) -> bool:
         return self._absorbing

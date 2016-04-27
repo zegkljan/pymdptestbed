@@ -1,5 +1,6 @@
 import sys
 import textwrap
+from importlib.machinery import SourceFileLoader
 
 import mdp_testbed.ui as ui
 
@@ -26,5 +27,6 @@ if __name__ == '__main__':
         editor.mainloop()
     else:
         print('TODO run VI algorithm')
-        viewer = ui.SolutionViewer()
+        foo = SourceFileLoader('module', arg).load_module()
+        viewer = ui.SolutionViewer(foo.Solver())
         viewer.mainloop()
