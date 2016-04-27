@@ -476,7 +476,7 @@ class MazeView(tk.Frame):
     def _draw_rewards(self):
         for x, y in prod(self.maze.get_width(), self.maze.get_height()):
             self._draw_text(x, y, rgb2color(*self.reward_label_color),
-                            str(self.maze.get_reward(x, y)), tk.SW)
+                            str(self.maze._get_reward(x, y)), tk.SW)
 
     def _draw_maze(self):
         self.cell_ids.clear()
@@ -603,14 +603,14 @@ class SolutionView(MazeView):
         self._environment = environment
         self._solution.solve_mdp(self._environment)
         self._states_values_actions = {
-            s.get_coords(): (s,
-                             self._solution.get_value_for_state(s),
-                             self._solution.get_action_for_state(s))
+            s._get_coords(): (s,
+                              self._solution.get_value_for_state(s),
+                              self._solution.get_action_for_state(s))
             for s in self.environment.get_all_states()
-            if not s.is_dummy()
+            if not s._is_dummy()
         }
         vals = [v for s, v, _ in self._states_values_actions.values()
-                if not s.is_dummy()]
+                if not s._is_dummy()]
         self._min_v = min(vals)
         self._max_v = max(vals)
 

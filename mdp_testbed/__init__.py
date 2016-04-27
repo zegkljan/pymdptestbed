@@ -14,7 +14,7 @@ class MDPModel(object):
         height = maze.get_height()
 
         self._all_states = []
-        self._dummy_state = State.dummy()
+        self._dummy_state = State._dummy()
 
         for x, y in prod(width, height):
             absorbing = maze.is_absorbing_goal(x, y)
@@ -53,7 +53,7 @@ class MDPModel(object):
             return 1
 
         # absorbing state
-        if fromS.is_absorbing():
+        if fromS._is_absorbing():
             if future_state != self._dummy_state:
                 return 0
 
@@ -61,7 +61,7 @@ class MDPModel(object):
                 return 1
 
         # teleport state
-        if fromS.is_teleport():
+        if fromS._is_teleport():
             if toS != self._dummy_state:
                 return 1.0 / self._normal_states
             return 0
@@ -70,11 +70,9 @@ class MDPModel(object):
         if toS == self._dummy_state:
             return 0
 
-        fx = fromS.get_x()
-        fy = fromS.get_y()
+        fx, fy = fromS._get_coords()
 
-        tx = toS.get_x()
-        ty = toS.get_y()
+        tx, ty = toS._get_coords()
 
         dx = fx - tx
         dy = fy - ty
@@ -143,7 +141,7 @@ class MDPModel(object):
         return 0
 
     def get_reward(self, state: State):
-        return state.get_reward()
+        return state._get_reward()
 
 
 class Environment(object):

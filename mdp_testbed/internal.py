@@ -13,20 +13,16 @@ except:
 
 
 class Action(enum.Enum):
-    go_west = 1
-    west = 1
+    WEST = 1
     W = 1
 
-    go_east = 2
-    east = 2
+    EAST = 2
     E = 2
 
-    go_north = 3
-    north = 3
+    NORTH = 3
     N = 3
 
-    go_south = 4
-    south = 4
+    SOUTH = 4
     S = 4
 
 
@@ -223,29 +219,29 @@ class State(object):
         self._dummy = False
 
     @staticmethod
-    def dummy():
+    def _dummy():
         # noinspection PyTypeChecker
         s = State(None, None, 0, None, None)
         s._dummy = True
         return s
 
-    def get_x(self) -> int:
-        return self._x
-
-    def get_y(self) -> int:
-        return self._y
-
-    def get_coords(self) -> tuple:
+    def _get_coords(self) -> tuple:
         return self._x, self._y
 
-    def is_absorbing(self) -> bool:
+    def _is_absorbing(self) -> bool:
         return self._absorbing
 
-    def is_teleport(self) -> bool:
+    def _is_teleport(self) -> bool:
         return self._telport
 
-    def get_reward(self) -> float:
+    def _get_reward(self) -> float:
         return self._reward
 
-    def is_dummy(self) -> bool:
+    def _is_dummy(self) -> bool:
         return self._dummy
+
+    def __hash__(self):
+        return super().__hash__()
+
+    def __eq__(self):
+        return super().__eq__()
