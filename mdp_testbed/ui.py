@@ -476,21 +476,27 @@ class MazeView(tk.Frame):
     def _draw_rewards(self):
         for x, y in prod(self.maze.get_width(), self.maze.get_height()):
             self._draw_text(x, y, rgb2color(*self.reward_label_color),
-                            str(self.maze._get_reward(x, y)), tk.SW)
+                            str(self.maze.get_reward(x, y)), tk.SW)
 
     def _draw_maze(self):
         self.cell_ids.clear()
-        for ix, iy in prod(self.maze.get_width(), self.maze.get_height()):
-            id_ = self._draw_cell(ix, iy)
-            self.cell_ids[id_] = (ix, iy)
+        for x, y in prod(self.maze.get_width(), self.maze.get_height()):
+            id_ = self._draw_cell(x, y)
+            self.cell_ids[id_] = (x, y)
 
     def _draw_cell(self, ix, iy):
         x = ix * self.node_length
         y = iy * self.node_length
+        f = self.normal_color
+        if self.maze.is_absorbing_goal(ix, iy):
+            f = self.goal_color
+        elif self.maze.is_teleport_state(ix, iy):
+            f = self.teleport_color
         id_ = self.canvas.create_rectangle(x, y,
                                            x + self.node_length,
                                            y + self.node_length,
-                                           width=1, fill=self.normal_color)
+                                           width=1,
+                                           fill=rgb2color(*f))
         return id_
 
     def _draw_walls(self):

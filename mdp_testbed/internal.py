@@ -243,5 +243,5 @@ class State(object):
     def __hash__(self):
         return super().__hash__()
 
-    def __eq__(self):
-        return super().__eq__()
+    def __eq__(self, other):
+        return super().__eq__(other)

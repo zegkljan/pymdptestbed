@@ -125,9 +125,9 @@ class MDPModel(object):
 
         if fx == tx:
             if fy > ty:
-                return p_s
-            elif fy < ty:
                 return p_n
+            elif fy < ty:
+                return p_s
         elif fy == ty:
             if fx > tx:
                 return p_w
