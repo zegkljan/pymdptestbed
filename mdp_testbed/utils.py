@@ -16,5 +16,3 @@ class Container(object):
     @val.setter
     def val(self, contents):
         self._contents = contents
-
-

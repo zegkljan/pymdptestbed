@@ -1,31 +1,33 @@
-import sys
-import textwrap
-from importlib.machinery import SourceFileLoader
+import argparse
 
 import mdp_testbed.ui as ui
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print(textwrap.dedent('''
-        Wrong number of arguments.
-
-        Usage: {} (editor | classname)
-
-        The program takes a single argument which is either "editor"
-        or a name of a class.
-
-        If the argument is "editor" (case insensitive) a maze editor is
-        launched. Otherwise a class with the specified name will be loaded
-        and used for learning.
-        ''').strip().format(sys.argv[0]), file=sys.stderr)
-        sys.exit(1)
-
-    arg = sys.argv[1]
-
-    if arg.lower() == 'editor':
-        editor = ui.ResourceMazeEditor()
-        editor.mainloop()
+    ap = argparse.ArgumentParser(description='MDP Testbed')
+    grp = ap.add_mutually_exclusive_group(required=False)
+    grp.add_argument('-e', '--editor', action='store_true', required=False,
+                     help='If specified, the editor will be launched, '
+                          'otherwise the solution viewer will be launched.')
+    grp.add_argument('-s', '--solution', action='store', required=False,
+                     nargs=1, metavar='filename', default=None,
+                     help='If specified, the solution viewer will be launched '
+                          'and will immediately load the  solution given in '
+                          'the filename. Otherwise no solution will be loaded '
+                          '(and can be loaded using the GUI).')
+    ap.add_argument('-m', '--maze', action='store', required=False, nargs=1,
+                    metavar='filename', default=None,
+                    help='If specified, the solution viewer or the editor '
+                         'will be started with the specified maze already '
+                         'loaded. Otherwise no maze will be loaded (and can '
+                         'be loaded using the GUI).')
+    ns = ap.parse_args()
+    if ns.editor:
+        top, gui = ui.ResourceMazeEditor.create_editor()
     else:
-        foo = SourceFileLoader('module', arg).load_module()
-        viewer = ui.SolutionViewer(foo.Solver())
-        viewer.mainloop()
+        top, gui = ui.SolutionViewer.create_viewer()
+        if ns.solution is not None:
+            gui.after(1, gui.load_solution, ns.solution[0])
+    if ns.maze is not None:
+        gui.load_maze(ns.maze[0])
+    # noinspection PyUnresolvedReferences
+    top.mainloop()

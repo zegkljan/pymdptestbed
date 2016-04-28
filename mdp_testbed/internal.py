@@ -260,6 +260,7 @@ class MDPModel(object):
         height = maze.get_height()
 
         self._all_states = []
+        # noinspection PyProtectedMember
         self._dummy_state = State._dummy()
 
         for x, y in prod(width, height):
@@ -284,6 +285,7 @@ class MDPModel(object):
     def get_all_states(self):
         return self._all_states
 
+    # noinspection PyProtectedMember
     def get_transition_probability(self,
                                    current_state: State,
                                    action: Action,
@@ -386,5 +388,7 @@ class MDPModel(object):
         print('Bad direction', file=sys.stderr)
         return 0
 
-    def get_reward(self, state: State):
+    @staticmethod
+    def get_reward(state: State):
+        # noinspection PyProtectedMember
         return state._get_reward()
