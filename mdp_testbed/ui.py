@@ -1,4 +1,7 @@
 import enum
+import queue
+import threading
+import time
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.messagebox as mb
@@ -241,6 +244,7 @@ class ResourceMazeEditor(tk.Frame):
         if len(fn) == 0:
             return
         self.load_maze(fn)
+        self.maze_view.repaint()
 
     def load_maze(self, fn):
         self.maze = Maze.load_from_file(fn)
@@ -248,7 +252,6 @@ class ResourceMazeEditor(tk.Frame):
         self.height_field.delete(0)
         self.width_field.insert(0, str(self.maze.get_width()))
         self.height_field.insert(0, str(self.maze.get_height()))
-        self.maze_view.repaint()
 
 
 class SolutionViewer(tk.Frame):
@@ -266,13 +269,17 @@ class SolutionViewer(tk.Frame):
 
         self.maze_cont = Container()
         self.environment = None
+        self.solver_filename = None
         self.solver = None
+        self.solved_queue = queue.Queue()
+        self.start_time = None
 
         self.zoom_var = tk.IntVar(value=40)
         self.draw_actions_var = tk.BooleanVar(value=True)
-        self.draw_values_var = tk.BooleanVar(value=True)
+        self.draw_value_labels_var = tk.BooleanVar(value=True)
+        self.draw_value_colors_var = tk.BooleanVar(value=True)
         self.draw_goals_var = tk.BooleanVar(value=True)
-        self.draw_rewards_var = tk.BooleanVar(value=True)
+        self.draw_rewards_var = tk.BooleanVar(value=False)
         self.draw_teleports_var = tk.BooleanVar(value=True)
         self.draw_walls_var = tk.BooleanVar(value=True)
 
@@ -304,61 +311,78 @@ class SolutionViewer(tk.Frame):
                                               variable=self.draw_actions_var)
         self.draw_actions_cb.grid(column=0, row=0, sticky=tk.W)
 
-        self.draw_values_cb = tk.Checkbutton(self.menu_panel,
-                                             text='draw values',
-                                             variable=self.draw_values_var)
-        self.draw_values_cb.grid(column=0, row=1, sticky=tk.W)
+        self.draw_value_labels_cb = tk.Checkbutton(
+            self.menu_panel, text='display values',
+            variable=self.draw_value_labels_var)
+        self.draw_value_labels_cb.grid(column=0, row=1, sticky=tk.W)
+
+        self.draw_value_colors_cb = tk.Checkbutton(
+            self.menu_panel, text='highlight values',
+            variable=self.draw_value_colors_var)
+        self.draw_value_colors_cb.grid(column=0, row=2, sticky=tk.W)
 
         self.draw_rewards_cb = tk.Checkbutton(self.menu_panel,
-                                              text='draw rewards',
+                                              text='display rewards',
                                               variable=self.draw_rewards_var)
-        self.draw_rewards_cb.grid(column=0, row=2, sticky=tk.W)
+        self.draw_rewards_cb.grid(column=0, row=3, sticky=tk.W)
 
         self.draw_goals_cb = tk.Checkbutton(self.menu_panel,
                                             text='draw goals',
                                             variable=self.draw_goals_var)
-        self.draw_goals_cb.grid(column=0, row=3, sticky=tk.W)
+        self.draw_goals_cb.grid(column=0, row=4, sticky=tk.W)
 
         self.draw_teleports_cb = tk.Checkbutton(
             self.menu_panel, text='draw teleports',
             variable=self.draw_teleports_var)
-        self.draw_teleports_cb.grid(column=0, row=4, sticky=tk.W)
+        self.draw_teleports_cb.grid(column=0, row=5, sticky=tk.W)
 
         self.draw_walls_cb = tk.Checkbutton(self.menu_panel,
                                             text='draw walls',
                                             variable=self.draw_walls_var)
-        self.draw_walls_cb.grid(column=0, row=5, sticky=tk.W)
+        self.draw_walls_cb.grid(column=0, row=6, sticky=tk.W)
 
         ttk.Separator(self.menu_panel, orient=tk.HORIZONTAL).grid(
-            column=0, row=6, sticky=tk.N + tk.S + tk.W + tk.E, pady=3)
+            column=0, row=7, sticky=tk.N + tk.S + tk.W + tk.E, pady=3)
         self.load_maze_button = tk.Button(self.menu_panel, text='Load maze',
                                           command=self._handle_load_maze)
-        self.load_maze_button.grid(column=0, row=7, sticky=tk.W + tk.E)
+        self.load_maze_button.grid(column=0, row=8, sticky=tk.W + tk.E)
 
         self.load_solution_button = tk.Button(
             self.menu_panel, text='Load solution',
             command=self._handle_load_solution)
-        self.load_solution_button.grid(column=0, row=8, sticky=tk.W + tk.E)
+        self.load_solution_button.grid(column=0, row=9, sticky=tk.W + tk.E)
+
+        self.reload_solution_button = tk.Button(
+            self.menu_panel, text='Reload/rerun solution',
+            command=self._handle_reload_solution, state=tk.DISABLED)
+        self.reload_solution_button.grid(column=0, row=10, sticky=tk.W + tk.E)
 
         self.zoom_scale = tk.Scale(self.menu_panel, orient=tk.HORIZONTAL,
                                    label='Cell size (zoom)', command=self.zoom,
                                    from_=20, to=100, variable=self.zoom_var)
         self.zoom_scale.set(50)
-        self.zoom_scale.grid(column=0, row=9, sticky=tk.W + tk.E)
+        self.zoom_scale.grid(column=0, row=11, sticky=tk.W + tk.E)
 
         # maze view panel
         self.maze_view = SolutionView(self, self.maze_cont,
                                       self.zoom_var,
                                       self.draw_actions_var,
-                                      self.draw_values_var,
+                                      self.draw_value_labels_var,
+                                      self.draw_value_colors_var,
                                       self.draw_goals_var,
                                       self.draw_rewards_var,
                                       self.draw_teleports_var,
                                       self.draw_walls_var)
-        self.maze_view.grid(column=2, row=0, sticky=tk.N + tk.S + tk.W + tk.E)
+        self.maze_view.grid(column=1, row=0, sticky=tk.N + tk.S + tk.W + tk.E)
         self.maze_view.repaint()
 
-        self.columnconfigure(2, weight=1)
+        # status bar
+        self.status_bar = tk.Label(
+            self, text='Solution file: {}'.format(self.solver_filename), bd=1,
+            relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.grid(column=0, row=1, columnspan=2, sticky=tk.W + tk.E)
+
+        self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
     # noinspection PyUnusedLocal
@@ -389,31 +413,52 @@ class SolutionViewer(tk.Frame):
             return
         self.load_solution(fn)
 
-    def load_solution(self, solution_fn):
-        solution_module = SourceFileLoader('module', solution_fn).load_module()
+    # noinspection PyUnusedLocal
+    def _handle_reload_solution(self, *args):
+        if self.solver_filename is not None:
+            self.load_solution(self.solver_filename)
+
+    def load_solution(self, fn):
+        self.solver_filename = fn
+        self.status_bar.config(text='Solution file: {}'.format(
+            self.solver_filename))
+        self.reload_solution_button.config(state=tk.NORMAL)
+        try:
+            solution_module = SourceFileLoader('module', fn).load_module()
+        except Exception as e:
+            mb.showerror(e.__class__.__name__,
+                         'An exception occurred during loading the solver '
+                         'file. Traceback will be written to the '
+                         'standard error output.')
+            raise
         try:
             self.solver = solution_module.Solver()
         except Exception as e:
             mb.showerror(e.__class__.__name__,
                          'An exception occurred during constructor call of '
                          'your solver. Traceback will be written to the '
-                         'standard output.')
+                         'standard error output.')
             raise
-        self.solve()
-        self.maze_view.repaint()
+        threading.Thread(target=self.solve).start()
+        self.after(100, self._wait_for_solve)
 
     # noinspection PyProtectedMember
     def solve(self):
         if self.solver is None or self.environment is None:
             return
+        print('--- Solving MDP using solver loaded from {} ---'.format(
+            self.solver_filename))
+        self.start_time = time.time()
         try:
             self.solver.solve_mdp(self.environment)
         except Exception as e:
             mb.showerror(e.__class__.__name__,
                          'An exception occurred during solving the MDP using '
                          'your solver. Traceback will be written to the '
-                         'standard output')
+                         'standard error output')
+            self.solved_queue.put(False)
             raise
+        print('Time taken: {:.2f} s'.format(time.time() - self.start_time))
         self.maze_view.states_values_actions = {
             s._get_coords(): (s,
                               self.solver.get_value_for_state(s),
@@ -425,7 +470,15 @@ class SolutionViewer(tk.Frame):
                 if not s._is_dummy()]
         self.maze_view.min_v = min(vals)
         self.maze_view.max_v = max(vals)
-        self.maze_view.solved = True
+        self.solved_queue.put(True)
+
+    def _wait_for_solve(self):
+        try:
+            solved = self.solved_queue.get_nowait()
+            self.maze_view.solved = solved
+            self.maze_view.repaint()
+        except queue.Empty:
+            self.after(100, self._wait_for_solve)
 
 
 class MazeView(tk.Frame):
@@ -669,8 +722,8 @@ class MazeView(tk.Frame):
 
 class SolutionView(MazeView):
     def __init__(self, master, maze_cont, zoom_var, draw_actions_var,
-                 draw_values_var, draw_goals_var, draw_rewards_var,
-                 draw_teleports_var, draw_walls_var, **kw):
+                 draw_value_labels_var, draw_value_colors_var, draw_goals_var,
+                 draw_rewards_var, draw_teleports_var, draw_walls_var, **kw):
         super().__init__(master, maze_cont, zoom_var, tk.IntVar(),
                          tk.IntVar(value=EditMode.normal.value), **kw)
 
@@ -683,7 +736,7 @@ class SolutionView(MazeView):
         self.arrow_color = '#ff0000'
         self.arrow_width = 3
 
-        self.value_cmap_neg = create_colormap(np.array([[0.0, 180 / 255],
+        self.value_cmap_neg = create_colormap(np.array([[0.0, 130 / 255],
                                                         [1.0,   0 / 255]]),
                                               np.array([[0.0,   0 / 255],
                                                         [1.0,   0 / 255]]),
@@ -713,9 +766,12 @@ class SolutionView(MazeView):
         self.draw_actions_var = draw_actions_var
         self.draw_actions_var.trace('w',
                                     lambda *a: self.repaint())
-        self.draw_values_var = draw_values_var
-        self.draw_values_var.trace('w',
-                                   lambda *a: self.repaint())
+        self.draw_value_labels_var = draw_value_labels_var
+        self.draw_value_labels_var.trace('w',
+                                         lambda *a: self.repaint())
+        self.draw_value_colors_var = draw_value_colors_var
+        self.draw_value_colors_var.trace('w',
+                                         lambda *a: self.repaint())
         self.draw_goals_var = draw_goals_var
         self.draw_goals_var.trace('w',
                                   lambda *a: self.repaint())
@@ -740,7 +796,7 @@ class SolutionView(MazeView):
             super()._draw_rewards()
 
     def _draw_value_labels(self):
-        if not self.draw_values_var.get() or not self.solved:
+        if not self.draw_value_labels_var.get() or not self.solved:
             return
         for (x, y), (s, v, _) in self.states_values_actions.items():
             self._draw_text(x, y, rgb2color(*self.value_label_color),
@@ -753,7 +809,7 @@ class SolutionView(MazeView):
         is_teleport = self.maze.is_teleport_state(ix, iy)
         is_goal = self.maze.is_absorbing_goal(ix, iy)
         f = self.normal_color
-        if self.draw_values_var.get() and self.solved:
+        if self.draw_value_colors_var.get() and self.solved:
             _, value, _ = self.states_values_actions[(ix, iy)]
             if value < 0:
                 norm_val = int(np.interp(value,
