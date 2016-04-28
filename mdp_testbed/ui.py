@@ -6,13 +6,13 @@ import tkinter.ttk as ttk
 import numpy as np
 
 import mdp_testbed
-import mdp_testbed.internal as internal
-from mdp_testbed.utils import prod
+from mdp_testbed.internal import Action, Maze
+from mdp_testbed.utils import prod, Container
 
-act_vector = {internal.Action.N: np.array([0, -1], dtype='l'),
-              internal.Action.S: np.array([0, +1], dtype='l'),
-              internal.Action.W: np.array([-1, 0], dtype='l'),
-              internal.Action.E: np.array([+1, 0], dtype='l')}
+act_vector = {mdp_testbed.internal.Action.N: np.array([0, -1], dtype='l'),
+              mdp_testbed.internal.Action.S: np.array([0, +1], dtype='l'),
+              mdp_testbed.internal.Action.W: np.array([-1, 0], dtype='l'),
+              mdp_testbed.internal.Action.E: np.array([+1, 0], dtype='l')}
 
 
 def rgb2color(r, g, b):
@@ -44,19 +44,6 @@ class EditMode(enum.Enum):
     absorbing = 3
     teleport = 4
     reward = 5
-
-
-class Container(object):
-    def __init__(self, contents=None):
-        self._contents = contents
-
-    @property
-    def val(self):
-        return self._contents
-
-    @val.setter
-    def val(self, contents):
-        self._contents = contents
 
 
 # noinspection PyAttributeOutsideInit
@@ -176,13 +163,14 @@ class ResourceMazeEditor(tk.Frame):
         self.columnconfigure(2, weight=1)
         self.rowconfigure(0, weight=1)
 
+    # noinspection PyUnusedLocal
     def set_size(self, *args):
         w = int(self.width_var.get())
         h = int(self.height_var.get())
-        self.maze = internal.Maze(w, h, 0)
+        self.maze = Maze(w, h, 0)
         self.maze_view.repaint()
 
-    # noinspection PyUnboundLocalVariable
+    # noinspection PyUnusedLocal
     def toggle_mode(self, mode, *args):
         self.reward_button.config(relief='raised')
         self.add_walls_button.config(relief='raised')
@@ -197,6 +185,8 @@ class ResourceMazeEditor(tk.Frame):
             button = self.add_teleport_states
         elif mode is EditMode.reward:
             button = self.reward_button
+        else:
+            raise ValueError('Invalid edit mode')
 
         curr_mode = EditMode(self.edit_mode_var.get())
         if mode is curr_mode:
@@ -207,6 +197,7 @@ class ResourceMazeEditor(tk.Frame):
             self.edit_mode_var.set(mode.value)
         print('Edit mode: {}'.format(EditMode(self.edit_mode_var.get())))
 
+    # noinspection PyUnusedLocal
     def set_reward_global(self, *args):
         val = float(self.reward_field.get())
         for x, y in prod(self.maze.get_width(), self.maze.get_height()):
@@ -215,24 +206,28 @@ class ResourceMazeEditor(tk.Frame):
                 self.maze.set_reward(x, y, val)
         self.maze_view.repaint()
 
+    # noinspection PyUnusedLocal
     def zoom(self, *args):
         self.maze_view.repaint()
 
+    # noinspection PyUnusedLocal
     def reset_maze(self, * args):
         self.maze.__init__(self.maze.get_width(), self.maze.get_height(), 0.0)
         self.maze_view.repaint()
 
+    # noinspection PyUnusedLocal
     def save_maze(self, *args):
         fn = fd.asksaveasfilename(defaultextension='.zip',
                                   filetypes=[('ZIP', '*.zip')],
                                   initialdir='./mazes')
         self.maze.save_to_file(fn)
 
+    # noinspection PyUnusedLocal
     def load_maze(self, *args):
         fn = fd.askopenfilename(defaultextension='.zip',
                                 filetypes=[('ZIP', '*.zip')],
                                 initialdir='./mazes')
-        self.maze = internal.Maze.load_from_file(fn)
+        self.maze = Maze.load_from_file(fn)
         self.width_field.delete(0)
         self.height_field.delete(0)
         self.width_field.insert(0, str(self.maze.get_width()))
@@ -333,20 +328,23 @@ class SolutionViewer(tk.Frame):
         self.columnconfigure(2, weight=1)
         self.rowconfigure(0, weight=1)
 
+    # noinspection PyUnusedLocal
     def zoom(self, *args):
         self.maze_view.repaint()
 
+    # noinspection PyUnusedLocal
     def load_maze(self, *args):
         fn = fd.askopenfilename(defaultextension='.zip',
                                 filetypes=[('ZIP', '*.zip')],
                                 initialdir='./mazes')
-        self.maze = internal.Maze.load_from_file(fn)
+        self.maze = Maze.load_from_file(fn)
         self.maze_view.environment = mdp_testbed.Environment(self.maze)
         self.maze_view.repaint()
 
 
 class MazeView(tk.Frame):
-    def __init__(self, master, maze_cont, zoom_var, reward_var, edit_mode_var, **kw):
+    def __init__(self, master, maze_cont, zoom_var, reward_var, edit_mode_var,
+                 **kw):
         cnf = {}
         super().__init__(master, cnf, **kw)
 
@@ -355,8 +353,8 @@ class MazeView(tk.Frame):
         self.offset = (5, 5)
         self.reward_label_color = (0, 0, 0)
         self.normal_color = (255, 255, 255)
-        self.goal_color = (127, 0, 0)
-        self.teleport_color = (170, 72, 156)
+        self.special_color = (127, 127, 255)
+        self.special_padding = 0.2
 
         self.maze_cont = maze_cont
 
@@ -404,11 +402,11 @@ class MazeView(tk.Frame):
             if x1 + 1 == x2:
                 assert y1 == y2
                 self.maze.set_vertical_wall(
-                    x2, y1, not self.maze.is_wall(x1, y1, internal.Action.E))
+                    x2, y1, not self.maze.is_wall(x1, y1, Action.E))
             elif y1 + 1 == y2:
                 assert x1 == x2
                 self.maze.set_horizontal_wall(
-                    x1, y2, not self.maze.is_wall(x1, y1, internal.Action.S))
+                    x1, y2, not self.maze.is_wall(x1, y1, Action.S))
             else:
                 raise ValueError('Invalid wall')
             self.repaint()
@@ -438,32 +436,31 @@ class MazeView(tk.Frame):
             return
         self.node_length = self.zoom_var.get()
         self._draw_maze()
+        self._draw_actions()
         self._draw_rewards()
         self._draw_value_labels()
-        self._draw_actions()
         self._draw_walls()
 
         self.canvas.move(tk.ALL, *self.offset)
 
-    def _draw_text(self, x: int, y: int, c, text: str, place):
+    def _draw_text(self, x: int, y: int, c, text: str, place, anchor):
         if place == tk.SW:
-            anchor = tk.SW
-            dx = 0
-            dy = 1
+            dx, dy = 0, 1
             ex = self.wall_width / 2 + 2
             ey = -self.wall_width / 2 - 2
         elif place == tk.NE:
-            anchor = tk.NE
-            dx = 1
-            dy = 0
+            dx, dy = 1, 0
             ex = -self.wall_width / 2 - 2
             ey = self.wall_width / 2 + 2
         elif place == tk.NW:
-            anchor = tk.NW
-            dx = 0
-            dy = 0
+            dx = dy = 0
             ex = self.wall_width / 2 + 2
             ey = self.wall_width / 2 + 2
+        elif place == tk.CENTER:
+            dx = dy = .5
+            ex = ey = 0
+        else:
+            raise NotImplementedError('Unsupported text placement.')
         id_ = self.canvas.create_text(
             (x + dx) * self.node_length + ex,
             (y + dy) * self.node_length + ey,
@@ -476,7 +473,8 @@ class MazeView(tk.Frame):
     def _draw_rewards(self):
         for x, y in prod(self.maze.get_width(), self.maze.get_height()):
             self._draw_text(x, y, rgb2color(*self.reward_label_color),
-                            str(self.maze.get_reward(x, y)), tk.SW)
+                            '{:.2f}'.format(self.maze.get_reward(x, y)),
+                            tk.CENTER, tk.N)
 
     def _draw_maze(self):
         self.cell_ids.clear()
@@ -487,16 +485,32 @@ class MazeView(tk.Frame):
     def _draw_cell(self, ix, iy):
         x = ix * self.node_length
         y = iy * self.node_length
+        pad = self.special_padding * (self.node_length + self.wall_width)
         f = self.normal_color
-        if self.maze.is_absorbing_goal(ix, iy):
-            f = self.goal_color
-        elif self.maze.is_teleport_state(ix, iy):
-            f = self.teleport_color
         id_ = self.canvas.create_rectangle(x, y,
                                            x + self.node_length,
                                            y + self.node_length,
                                            width=1,
                                            fill=rgb2color(*f))
+        if self.maze.is_absorbing_goal(ix, iy):
+            self.canvas.create_rectangle(
+                x + pad,
+                y + pad,
+                x + self.node_length - pad,
+                y + self.node_length - pad,
+                width=3,
+                outline=rgb2color(*self.special_color),
+                fill=rgb2color(*self.special_color)
+            )
+        elif self.maze.is_teleport_state(ix, iy):
+            self.canvas.create_rectangle(
+                x + pad,
+                y + pad,
+                x + self.node_length - pad,
+                y + self.node_length - pad,
+                width=3,
+                outline=rgb2color(*self.special_color)
+            )
         return id_
 
     def _draw_walls(self):
@@ -505,7 +519,7 @@ class MazeView(tk.Frame):
 
         walls = set()
         for x, y in prod(w, h):
-            for action in internal.Action:
+            for action in mdp_testbed.internal.Action:
                 if self.maze.is_wall(x, y, action):
                     walls.add((x, y, action))
 
@@ -514,15 +528,15 @@ class MazeView(tk.Frame):
             bx = x
             ay = y
             by = y
-            if action is internal.Action.N:
+            if action is mdp_testbed.internal.Action.N:
                 bx += 1
-            elif action is internal.Action.S:
+            elif action is mdp_testbed.internal.Action.S:
                 bx += 1
                 ay += 1
                 by += 1
-            elif action is internal.Action.W:
+            elif action is mdp_testbed.internal.Action.W:
                 ay += 1
-            elif action is internal.Action.E:
+            elif action is mdp_testbed.internal.Action.E:
                 ax += 1
                 bx += 1
                 by += 1
@@ -553,8 +567,8 @@ class SolutionView(MazeView):
         self.reward_label_color = (0, 0, 0)
         self.value_label_color = (255, 255, 255)
 
-        self.arrow_length_frac = 0.7
-        self.arrow_start_offset = 0.5
+        self.arrow_length_frac = 0.5
+        self.arrow_start_offset = -0.5
         self.arrow_feather_length_frac = 0.7
         self.arrow_feather_angle = 25
         self.arrow_color = '#ff0000'
@@ -635,9 +649,12 @@ class SolutionView(MazeView):
             return
         for (x, y), (s, v, _) in self._states_values_actions.items():
             self._draw_text(x, y, rgb2color(*self.value_label_color),
-                            '{:.3f}'.format(v), tk.NW)
+                            '{:.2f}'.format(v), tk.CENTER, tk.S)
 
     def _draw_cell(self, ix, iy):
+        x = ix * self.node_length
+        y = iy * self.node_length
+        pad = self.special_padding * (self.node_length + self.wall_width)
         is_teleport = self.maze.is_teleport_state(ix, iy)
         is_goal = self.maze.is_absorbing_goal(ix, iy)
         f = self.normal_color
@@ -648,16 +665,31 @@ class SolutionView(MazeView):
                                      [0, 255]))
             value_color = apply_colormap(self.value_cmap, norm_val)
             f = value_color
-        if is_goal and self.draw_goals_var.get():
-            f = self.goal_color
-        elif is_teleport and self.draw_teleports_var.get():
-            f = self.teleport_color
-        x = ix * self.node_length
-        y = iy * self.node_length
         id_ = self.canvas.create_rectangle(x, y,
                                            x + self.node_length,
                                            y + self.node_length,
                                            width=1, fill=rgb2color(*f))
+
+        if is_goal and self.draw_goals_var.get():
+            self.canvas.create_rectangle(
+                x + pad,
+                y + pad,
+                x + self.node_length - pad,
+                y + self.node_length - pad,
+                width=3,
+                fill=rgb2color(*self.special_color),
+                outline=rgb2color(*self.special_color)
+            )
+        elif is_teleport and self.draw_teleports_var.get():
+            self.canvas.create_rectangle(
+                x + pad,
+                y + pad,
+                x + self.node_length - pad,
+                y + self.node_length - pad,
+                width=3,
+                outline=rgb2color(*self.special_color)
+            )
+
         return id_
 
     def _draw_walls(self):
