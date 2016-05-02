@@ -36,7 +36,7 @@ class Environment(object):
     def get_transition_probability(self,
                                    from_state: State,
                                    action: Action,
-                                   to_state: State):
+                                   to_state: State) -> float:
         return self._transition_model.get_transition_probability(from_state,
                                                                  action,
                                                                  to_state)
