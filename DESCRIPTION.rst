@@ -72,7 +72,9 @@ section, i.e. of the objects of classes ``Environment`` and ``State``\ .
 
 Everything related to your solver needs to be contained in a single python
 file. You can import whatever you need to import (libraries, other parts of
-the testbed...) but your code must be self-contained in that one file.
+the testbed...) but your code must be self-contained in that one file. Don't
+be afraid of that - a working, correct solution can fit 50 lines including
+imports (though it is not very computationally effective).
 
 Brief Description of the Testbed Framework
 ==========================================
