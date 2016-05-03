@@ -11,3 +11,23 @@ What is it exactly for?
 -----------------------
 Go directly to the [description](DESCRIPTION.rst) where you will find the
 detailed description of the assignment and how to use the environment.
+
+Install
+-------
+Just download or clone this repository, then run
+
+    $ python3 -m mdp_testbed -e
+
+to start the maze editor, or
+
+    $ python3 -m mdp_testbed
+
+to start the solution viewer, or
+
+    $ python3 -m mdp_testbed -h
+
+to get further info on how you can this app.
+
+Requirements
+------------
+The only non-standard libraries are ``numpy`` and ``tkinter``.
