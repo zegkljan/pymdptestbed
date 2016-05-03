@@ -79,6 +79,27 @@ imports (though it is not very computationally effective).
 Brief Description of the Testbed Framework
 ==========================================
 
+Requirements
+------------
+
+The framework is written in Python 3 so it has to be installed.
+In order for the framework to work, these libraries are needed:
+
+* numpy
+* tkinter
+
+Running the program
+-------------------
+
+The entry point is in the file ``mdp_testbed/__main__.py`` which is a
+file that is run when the package ``mdp_testbed`` is run as a module.
+Hence you can run the program like this::
+
+    $ python3 -m mdp_testbed
+
+Use the ``-h`` option (i.e. ``$ python3 -m mdp_testbed -h``\ ) to get
+help on how to run the editor/solution viewer.
+
 The ``Action`` enum
 -------------------
 
