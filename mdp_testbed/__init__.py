@@ -44,6 +44,10 @@ class Environment(object):
 
 # noinspection PyAttributeOutsideInit
 class SolverBase(object):
+    def __init__(self, gamma: float=.99, p_correct: float=.8):
+        self.gamma = gamma
+        self.p_correct = p_correct
+
     def solve_mdp(self, environment: Environment):
         self.environment = environment
         raise NotImplementedError()
