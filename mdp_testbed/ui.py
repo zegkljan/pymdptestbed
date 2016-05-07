@@ -426,8 +426,10 @@ class SolutionViewer(tk.Frame):
     def load_maze(self, fn):
         self.maze = Maze.load_from_file(fn)
         self.environment = mdp_testbed.Environment(self.maze)
-        self.solve()
+        self.maze_view.solved = False
         self.maze_view.repaint()
+        threading.Thread(target=self.solve).start()
+        self.after(100, self._wait_for_solve)
 
     # noinspection PyUnusedLocal
     def _handle_load_solution(self, *args):
@@ -464,12 +466,15 @@ class SolutionViewer(tk.Frame):
                          'your solver. Traceback will be written to the '
                          'standard error output.')
             raise
+        self.maze_view.solved = False
+        self.maze_view.repaint()
         threading.Thread(target=self.solve).start()
         self.after(100, self._wait_for_solve)
 
     # noinspection PyProtectedMember
     def solve(self):
         if self.solver is None or self.environment is None:
+            self.solved_queue.put(False)
             return
         print('--- Solving MDP using solver loaded from {} ---'.format(
             self.solver_filename))
@@ -611,6 +616,9 @@ class MazeView(tk.Frame):
     def scroll_move(self, evt: tk.Event):
         self._dragging = True
         self.canvas.scan_dragto(evt.x, evt.y, gain=1)
+
+    def clear(self):
+        self.canvas.delete(tk.ALL)
 
     def repaint(self):
         self.canvas.delete(tk.ALL)
