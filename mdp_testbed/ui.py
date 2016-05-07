@@ -270,6 +270,7 @@ class SolutionViewer(tk.Frame):
         self.maze_cont = Container()
         self.environment = None
         self.solver_filename = None
+        self.solver_class = None
         self.solver = None
         self.solved_queue = queue.Queue()
         self.start_time = None
@@ -434,7 +435,7 @@ class SolutionViewer(tk.Frame):
     # noinspection PyUnusedLocal
     def _handle_load_solution(self, *args):
         fn = fd.askopenfilename(defaultextension='.py',
-                                filetypes=[('Python module', '*.py')],
+                                filetypes=[('Python file', '*.py')],
                                 initialdir='.')
         if len(fn) == 0:
             return
@@ -454,17 +455,22 @@ class SolutionViewer(tk.Frame):
             solution_module = SourceFileLoader('module', fn).load_module()
         except Exception as e:
             mb.showerror(e.__class__.__name__,
-                         'An exception occurred during loading the solver '
-                         'file. Traceback will be written to the '
-                         'standard error output.')
+                         '{}\n\nAn exception occurred during loading the '
+                         'solver file. Traceback will be written to the '
+                         'standard error output.'.format(str(e)))
             raise
         try:
-            self.solver = solution_module.Solver()
+            self.solver_class = solution_module.Solver
+        except AttributeError:
+            mb.showerror('No Solver class',
+                         'There is no "Solver" class in your solution file.')
+            raise
         except Exception as e:
             mb.showerror(e.__class__.__name__,
-                         'An exception occurred during constructor call of '
-                         'your solver. Traceback will be written to the '
-                         'standard error output.')
+                         '{}\n\nAn exception occurred during searching for '
+                         'the "Solver" class in the solver file. Traceback '
+                         'will be written to the standard error '
+                         'output.'.format(str(e)))
             raise
         self.maze_view.solved = False
         self.maze_view.repaint()
@@ -473,33 +479,55 @@ class SolutionViewer(tk.Frame):
 
     # noinspection PyProtectedMember
     def solve(self):
-        if self.solver is None or self.environment is None:
+        if self.solver_class is None or self.environment is None:
             self.solved_queue.put(False)
             return
-        print('--- Solving MDP using solver loaded from {} ---'.format(
-            self.solver_filename))
+        print('--- Solver file: {} ---'.format(self.solver_filename))
+        print('--- Constructing solver ---')
+        try:
+            self.solver = self.solver_class(gamma=self.gamma_var.get(),
+                                            p_correct=self.p_correct_var.get())
+        except Exception as e:
+            mb.showerror(e.__class__.__name__,
+                         '{}\n\nAn exception occurred during constructor call '
+                         'of your solver. Traceback will be written to the '
+                         'standard error output.'.format(str(e)))
+            self.solved_queue.put(False)
+            raise
+        print('--- Solving MDP ---')
         self.start_time = time.time()
         try:
             self.solver.solve_mdp(self.environment)
         except Exception as e:
             mb.showerror(e.__class__.__name__,
-                         'An exception occurred during solving the MDP using '
-                         'your solver. Traceback will be written to the '
-                         'standard error output')
+                         '{}\n\nAn exception occurred during solving the MDP '
+                         'using your solver. Traceback will be written to the '
+                         'standard error output.'.format(str(e)))
             self.solved_queue.put(False)
             raise
         print('Time taken: {:.2f} s'.format(time.time() - self.start_time))
-        self.maze_view.states_values_actions = {
-            s._get_coords(): (s,
-                              self.solver.get_value_for_state(s),
-                              self.solver.get_action_for_state(s))
-            for s in self.environment.get_all_states()
-            if not s._is_dummy()
-            }
-        vals = [v for s, v, _ in self.maze_view.states_values_actions.values()
-                if not s._is_dummy()]
-        self.maze_view.min_v = min(vals)
-        self.maze_view.max_v = max(vals)
+        try:
+            self.maze_view.states_values_actions = {
+                s._get_coords(): (s,
+                                  self.solver.get_value_for_state(s),
+                                  self.solver.get_action_for_state(s))
+                for s in self.environment.get_all_states()
+                if not s._is_dummy()
+                }
+            vals = [v
+                    for s, v, _
+                    in self.maze_view.states_values_actions.values()
+                    if not s._is_dummy()]
+            self.maze_view.min_v = min(vals)
+            self.maze_view.max_v = max(vals)
+        except Exception as e:
+            mb.showerror(e.__class__.__name__,
+                         '{}\n\nAn exception occurred during extracting the '
+                         'actions and values from your solver. Traceback will '
+                         'be written to the standard error '
+                         'output.'.format(str(e)))
+            self.solved_queue.put(False)
+            raise
         self.solved_queue.put(True)
 
     def _wait_for_solve(self):
@@ -560,6 +588,7 @@ class MazeView(tk.Frame):
     def maze(self, m):
         self.maze_cont.val = m
 
+    # noinspection PyUnresolvedReferences
     def handle_click(self, evt: tk.Event):
         if self._dragging:
             self._dragging = False
@@ -610,9 +639,11 @@ class MazeView(tk.Frame):
                 self.maze.set_reward(x, y, val)
                 self.repaint()
 
+    # noinspection PyUnresolvedReferences
     def scroll_start(self, evt: tk.Event):
         self.canvas.scan_mark(evt.x, evt.y)
 
+    # noinspection PyUnresolvedReferences
     def scroll_move(self, evt: tk.Event):
         self._dragging = True
         self.canvas.scan_dragto(evt.x, evt.y, gain=1)
