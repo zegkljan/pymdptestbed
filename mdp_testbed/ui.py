@@ -282,6 +282,8 @@ class SolutionViewer(tk.Frame):
         self.draw_rewards_var = tk.BooleanVar(value=False)
         self.draw_teleports_var = tk.BooleanVar(value=True)
         self.draw_walls_var = tk.BooleanVar(value=True)
+        self.gamma_var = tk.DoubleVar(value=.95)
+        self.p_correct_var = tk.DoubleVar(value=.8)
 
         self.grid(sticky=tk.N + tk.S + tk.E + tk.W)
 
@@ -309,59 +311,82 @@ class SolutionViewer(tk.Frame):
         self.draw_actions_cb = tk.Checkbutton(self.menu_panel,
                                               text='draw actions',
                                               variable=self.draw_actions_var)
-        self.draw_actions_cb.grid(column=0, row=0, sticky=tk.W)
+        self.draw_actions_cb.grid(column=0, row=0, columnspan=2, sticky=tk.W)
 
         self.draw_value_labels_cb = tk.Checkbutton(
             self.menu_panel, text='display values',
             variable=self.draw_value_labels_var)
-        self.draw_value_labels_cb.grid(column=0, row=1, sticky=tk.W)
+        self.draw_value_labels_cb.grid(column=0, row=1, columnspan=2,
+                                       sticky=tk.W)
 
         self.draw_value_colors_cb = tk.Checkbutton(
             self.menu_panel, text='highlight values',
             variable=self.draw_value_colors_var)
-        self.draw_value_colors_cb.grid(column=0, row=2, sticky=tk.W)
+        self.draw_value_colors_cb.grid(column=0, row=2, columnspan=2,
+                                       sticky=tk.W)
 
         self.draw_rewards_cb = tk.Checkbutton(self.menu_panel,
                                               text='display rewards',
                                               variable=self.draw_rewards_var)
-        self.draw_rewards_cb.grid(column=0, row=3, sticky=tk.W)
+        self.draw_rewards_cb.grid(column=0, row=3, columnspan=2,
+                                  sticky=tk.W)
 
         self.draw_goals_cb = tk.Checkbutton(self.menu_panel,
                                             text='draw goals',
                                             variable=self.draw_goals_var)
-        self.draw_goals_cb.grid(column=0, row=4, sticky=tk.W)
+        self.draw_goals_cb.grid(column=0, row=4, columnspan=2, sticky=tk.W)
 
         self.draw_teleports_cb = tk.Checkbutton(
             self.menu_panel, text='draw teleports',
             variable=self.draw_teleports_var)
-        self.draw_teleports_cb.grid(column=0, row=5, sticky=tk.W)
+        self.draw_teleports_cb.grid(column=0, row=5, columnspan=2, sticky=tk.W)
 
         self.draw_walls_cb = tk.Checkbutton(self.menu_panel,
                                             text='draw walls',
                                             variable=self.draw_walls_var)
-        self.draw_walls_cb.grid(column=0, row=6, sticky=tk.W)
+        self.draw_walls_cb.grid(column=0, row=6, columnspan=2, sticky=tk.W)
 
         ttk.Separator(self.menu_panel, orient=tk.HORIZONTAL).grid(
-            column=0, row=7, sticky=tk.N + tk.S + tk.W + tk.E, pady=3)
+            column=0, row=7, columnspan=2, sticky=tk.N + tk.S + tk.W + tk.E,
+            pady=3)
         self.load_maze_button = tk.Button(self.menu_panel, text='Load maze',
                                           command=self._handle_load_maze)
-        self.load_maze_button.grid(column=0, row=8, sticky=tk.W + tk.E)
+        self.load_maze_button.grid(column=0, row=8, columnspan=2,
+                                   sticky=tk.W + tk.E)
 
         self.load_solution_button = tk.Button(
             self.menu_panel, text='Load solution',
             command=self._handle_load_solution)
-        self.load_solution_button.grid(column=0, row=9, sticky=tk.W + tk.E)
+        self.load_solution_button.grid(column=0, row=9, columnspan=2,
+                                       sticky=tk.W + tk.E)
 
         self.reload_solution_button = tk.Button(
             self.menu_panel, text='Reload/rerun solution',
             command=self._handle_reload_solution, state=tk.DISABLED)
-        self.reload_solution_button.grid(column=0, row=10, sticky=tk.W + tk.E)
+        self.reload_solution_button.grid(column=0, row=10, columnspan=2,
+                                         sticky=tk.W + tk.E)
 
+        tk.Label(self.menu_panel, text='Gamma').grid(column=0, row=11)
+        self.gamma_scale = tk.Spinbox(self.menu_panel, from_=0, to=1,
+                                      increment=.05, justify=tk.RIGHT, width=6,
+                                      textvariable=self.gamma_var)
+        self.gamma_scale.grid(column=1, row=11, sticky=tk.W + tk.E)
+
+        tk.Label(self.menu_panel, text='Pr correct').grid(column=0, row=12)
+        self.p_correct_spin = tk.Spinbox(self.menu_panel, from_=0, to=1,
+                                         increment=.05, justify=tk.RIGHT,
+                                         width=6,
+                                         textvariable=self.p_correct_var)
+        self.p_correct_spin.grid(column=1, row=12, sticky=tk.W + tk.E)
+
+        ttk.Separator(self.menu_panel, orient=tk.HORIZONTAL).grid(
+            column=0, row=13, columnspan=2, sticky=tk.N + tk.S + tk.W + tk.E,
+            pady=3)
         self.zoom_scale = tk.Scale(self.menu_panel, orient=tk.HORIZONTAL,
                                    label='Cell size (zoom)', command=self.zoom,
                                    from_=20, to=100, variable=self.zoom_var)
         self.zoom_scale.set(50)
-        self.zoom_scale.grid(column=0, row=11, sticky=tk.W + tk.E)
+        self.zoom_scale.grid(column=0, row=14, columnspan=2, sticky=tk.W + tk.E)
 
         # maze view panel
         self.maze_view = SolutionView(self, self.maze_cont,

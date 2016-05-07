@@ -49,7 +49,6 @@ class SolverBase(object):
         self.p_correct = p_correct
 
     def solve_mdp(self, environment: Environment):
-        self.environment = environment
         raise NotImplementedError()
 
     def get_action_for_state(self, state: State) -> Action:
