@@ -45,8 +45,8 @@ class Environment(object):
 # noinspection PyAttributeOutsideInit
 class SolverBase(object):
     def __init__(self, gamma: float=.99, p_correct: float=.8):
-        if gamma >= 1 or gamma < 0:
-            raise ValueError('Gamma must be from the range [0, 1).')
+        if gamma > 1 or gamma < 0:
+            raise ValueError('Gamma must be from the range [0, 1].')
         if p_correct > 1 or gamma < 0:
             raise ValueError('Prob. of correct cransition must be from the '
                              'range [0, 1].')

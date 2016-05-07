@@ -1,5 +1,8 @@
 .. sectnum::
 
+.. role:: latex(raw)
+   :format: latex
+
 ================================
 A(E)3M33UI - Semestral project 3
 ================================
@@ -17,11 +20,10 @@ Technical notes
 ===============
 
 For the labyrinth environment, implement the *Value Iteration* (VI)
-algorithm, for which one can set the discount factor :math:`\gamma`\ , and
-the reward :math:`r_0` for any non-terminal state. The implementation
-consists of a single python file which must contain a class called ``Solver``
-which derives from the class ``SolverBase`` that is defined in the
-``mdp_testbed`` package (i.e. the file ``mdp_testbed/__init__.py``\ ).
+algorithm. The implementation consists of a single python file which must
+contain a class called ``Solver`` which derives from the class ``SolverBase``
+that is defined in the ``mdp_testbed`` package (i.e. the file
+``mdp_testbed/__init__.py``\ ).
 
 The class must implement these methods:
 
@@ -50,6 +52,10 @@ The class must implement these methods:
   The ``State`` class is located in the ``mdp_testbed.internal`` module (i.e.
   in the file ``mpd_testbed/internal.py``\ ).
 
+The ``SolverBase`` class has two members: ``gamma`` and ``p_correct``
+which are set automatically when running the solver. You just need to use
+them properly (``self.gamma``, ``self.p_correct``).
+
 A working dummy solution with all the necessary structure is in the file
 ``dummy_solution.py``\ . This solution does no computation at all, it always
 performs the ``NORTH`` action and it returns the rewards as the values.
@@ -76,14 +82,77 @@ the testbed...) but your code must be self-contained in that one file. Don't
 be afraid of that - a working, correct solution can fit 50 lines including
 imports (though it is not very computationally effective).
 
+Experimental Goals
+==================
+
+Make experiments with the following values of the parameters:
+
+* Discount factor :math:`\gamma: 0.5, 0.9, 0.99, 1`
+* Reward :math:`r_0` for each non-terminal state [#]_: :math:`-10, -3, 0, 5`
+* Maximum error :math:`\epsilon: 0.1, 0.01, 0.001`
+
+.. [#] All the rewards are fixed in the maze. You must use the editor in
+   order to set them. See `Running the program`_\ .
+
+Report and discuss the results:
+
+* The resulting policies :math:`\pi(s)` and value functions :math:`V(s)`
+  for three selected interesting combinations of the parameters
+  :math:`\gamma`\ , :math:`r_0` and :math:`\epsilon`\ .
+* The dependence of the number of iterations and the total runtime on the
+
+  * Discount factor :math:`\gamma` (for :math:`\epsilon = 0.01` and
+    :math:`r_0 = -10`\ ).
+  * Maximum error :math:`\epsilon` (for :math:`\gamma = 0.99` and
+    :math:`r_0 = -10`\ ).
+
+* Compare the number of iterations needed for value function convergence and
+  for policy convergence. Discuss the difference.
+
+Evaluation and Submission
+=========================
+
+Maximum score is 10 points. If you do not submit a working implementation you
+get zero points.
+
+**Implementation** covers 0-4 points and the evaluation criteria are:
+
+* Satisfaction of the above specification.
+* Successfull pass in a validation trial consisting of one maze selected by
+  the teacher.
+
+**Report** covers 0-6 points and the evaluation criteria are:
+
+* A comprehensive and detailed description of the implementation (the
+  ``Solver`` class and the rest of your solution file).
+* Quantitative results of the experiments (tables, plots).
+* A reasonable discussion of the experimental results.
+* Grammatical and formal aspects.
+
+**Bonus** covers 0-2 points:
+
+* 1 point if the report is written in :latex:`\LaTeX`
+
+Submission
+----------
+
+A ZIP archive must be submitted that contains the following
+files:
+
+* A Python file (``*.py``\ ) with the required source code.
+* File ``surname.pdf`` with the report which includes these sections:
+  Implementation, Experimental results, Discussion.
+* :latex:`\LaTeX` sources if :latex:`\LaTeX` was used.
+
+
 Brief Description of the Testbed Framework
 ==========================================
 
 Requirements
 ------------
 
-The framework is written in Python 3 so it has to be installed.
-In order for the framework to work, these libraries are needed:
+The framework is written in Python 3 so it has to be installed (tested on
+python 3.4). In order for the framework to work, these libraries are needed:
 
 * numpy
 * tkinter
@@ -100,8 +169,11 @@ Hence you can run the program like this::
 Use the ``-h`` option (i.e. ``$ python3 -m mdp_testbed -h``\ ) to get
 help on how to run the editor/solution viewer.
 
+Important classes
+-----------------
+
 The ``Action`` enum
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 This enum is defined in the module ``mdp_testbed.internal``\ . It is an
 **enum**\ , pretty similar to Java enums, meaning it is a \`\`list'' of
@@ -147,7 +219,7 @@ like a constructor with the numerical value::
     Action.EAST
 
 The ``State`` class
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 This class represents a single state. There are no public methods or members
 of this class, hence you are not allowed to use any of them. However, the
@@ -155,7 +227,7 @@ objects of this class can be tested for equality using the ``==`` operator
 and can be used as keys in dictionaries.
 
 The ``Environment`` class
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This class represents the API which you can use to interact with the MDP. The
 class defines these **public** methods:
