@@ -239,7 +239,7 @@ class defines these **public** methods:
 
   *Example*\ : the agent chooses the action ``SOUTH``\ . With probability
   :math:`p` she will end up in the cell \`\`below'' the the one she is now and
-  with probability :math:`1 - p` whe will not.
+  with probability :math:`1 - p` she will not.
 
 * ``get_reward(self, state: State) -> float``
 

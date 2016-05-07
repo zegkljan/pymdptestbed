@@ -26,7 +26,7 @@ to start the solution viewer, or
 
     $ python3 -m mdp_testbed -h
 
-to get further info on how you can this app.
+to get further info on how you can run this app.
 
 Requirements
 ------------
